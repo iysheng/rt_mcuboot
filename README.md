@@ -63,6 +63,99 @@ You can run the [art_pi_bootloader](https://github.com/RT-Thread-Studio/sdk-bsp-
 
 The simple diff file is
 ``` diff
+diff --git a/projects/art_pi_bootloader/applications/main.c b/projects/art_pi_bootloader/applications/main.c
+index 0a76719..65c9f98 100644
+--- a/projects/art_pi_bootloader/applications/main.c
++++ b/projects/art_pi_bootloader/applications/main.c
+@@ -13,6 +13,11 @@
+ #include <board.h>
+ #include <drv_common.h>
+ #include "w25qxx.h"
++#ifdef PKG_USING_MCUBOOT
++#include "bootutil/bootutil.h"
++#include "bootutil/image.h"
++#include "bootutil/fault_injection_hardening.h"
++#endif
+
+ #define DBG_TAG "main"
+ #define DBG_LVL DBG_LOG
+@@ -26,25 +31,75 @@
+
+ typedef void (*pFunction)(void);
+ pFunction JumpToApplication;
++#ifdef PKG_USING_MCUBOOT
++struct boot_rsp g_mcuboot_rsp;
++
++struct arm_vector_table {
++    uint32_t msp;
++    uint32_t reset;
++};
++
++/**
++  * @brief 启动 image
++  * @param struct boot_rsp * rsp:
++  * retval N/A.
++  */
++static void do_boot(struct boot_rsp * rsp)
++{
++    struct arm_vector_table *vt;
++
++    LOG_I("imgae_off=%x flashid=%d", rsp->br_image_off, rsp->br_flash_dev_id);
++    LOG_I("raw_imgae_off=%x", (rsp->br_image_off + rsp->br_hdr->ih_hdr_size));
++
++    W25Q_Memory_Mapped_Enable();
++    vt = (struct arm_vector_table *)(rsp->br_image_off + rsp->br_hdr->ih_hdr_size);
++    SysTick->CTRL = 0;
++
++    SCB->VTOR = (uint32_t)vt;
++    __set_MSP(*(__IO uint32_t *)vt->msp);
++    ((void (*)(void))vt->reset)();
++
++    while(1);
++}
++#endif
+
+ int main(void)
+ {
++#ifdef PKG_USING_MCUBOOT
++    fih_int fih_ret;
++#endif
++
+     /* set LED0 pin mode to output */
+     rt_pin_mode(LED0_PIN, PIN_MODE_OUTPUT);
+
+     W25QXX_Init();
+
+-    W25Q_Memory_Mapped_Enable();
+
+     SCB_DisableICache();
+     SCB_DisableDCache();
+
++#ifdef PKG_USING_MCUBOOT
++    fih_ret = boot_go(&g_mcuboot_rsp);
++    if (FIH_SUCCESS == fih_ret)
++    {
++        LOG_I("get rsp success.");
++        do_boot(&g_mcuboot_rsp);
++        return 0;
++    }
++    else
++    {
++        LOG_E("get rsp failed.");
++        return -1;
++    }
++#else
++
+     SysTick->CTRL = 0;
+
+     JumpToApplication = (pFunction)(*(__IO uint32_t *)(APPLICATION_ADDRESS + 4));
+     __set_MSP(*(__IO uint32_t *)APPLICATION_ADDRESS);
+
+     JumpToApplication();
++#endif
+
+     return RT_EOK;
+ }
 ```
 
 After you run the art_pi_bootloader demo success with the package, you may see as:
@@ -75,7 +168,8 @@ After build your own app, first of all , you should use the [image_tool]() add i
 python imgtool.py sign --version 1.0.0 --header-size 0x1000 --align 4 --slot-size 0x40000 --pad-header demo.bin demo_header.bin
 ```
 
-Then you may download the `demo_header.bin` to address 0x0 of the flash chip w25q64. After you reboot, you may get:
+Then you may download the `demo_header.bin` to address 0x0 of the flash chip
+w25q64. After you reboot, you may get:
 ![](https://s3.bmp.ovh/imgs/2021/09/91c45c750932949a.png)
 
 Why this happened ? It's because you forget sign the image use the pem key `image_sign.pem`, so let's do as:
