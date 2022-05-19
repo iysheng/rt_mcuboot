@@ -56,6 +56,9 @@ MCUBOOT_LOG_MODULE_DECLARE(mcuboot);
 MCUBOOT_LOG_MODULE_REGISTER(mcuboot_util);
 #endif
 
+/* 保存 boot image magic
+ * 在 image trailer 的尾部
+ * */
 const uint32_t boot_img_magic[] = {
     0xf395c277,
     0x7fefd260,
@@ -259,38 +262,50 @@ boot_read_swap_state(const struct flash_area *fap,
     uint8_t swap_info;
     int rc;
 
+    /* 获取 magic 的偏移 */
     off = boot_magic_off(fap);
+    /* 将保存在 image trailer 中的 magic 读取到内存 */
     rc = flash_area_read(fap, off, magic, BOOT_MAGIC_SZ);
     if (rc < 0) {
         return BOOT_EFLASH;
     }
+    /* 判断指定的区域是否是擦除过的 */
     if (bootutil_buffer_is_erased(fap, magic, BOOT_MAGIC_SZ)) {
         state->magic = BOOT_MAGIC_UNSET;
     } else {
+        /* 如果不是对 magic 进行解码对比 */
         state->magic = boot_magic_decode(magic);
     }
 
+    /* 获取在 image trailer 中的 swap info 的偏移 */
     off = boot_swap_info_off(fap);
+    /* 从 flash 中读取 swap_info */
     rc = flash_area_read(fap, off, &swap_info, sizeof swap_info);
     if (rc < 0) {
         return BOOT_EFLASH;
     }
 
     /* Extract the swap type and image number */
+    /* 根据 image trailer 中的内容获取 swap type 以及 image number,这些信息
+     * 都是在打包 image 的时候确定的
+     * */
     state->swap_type = BOOT_GET_SWAP_TYPE(swap_info);
     state->image_num = BOOT_GET_IMAGE_NUM(swap_info);
 
+    /* 如果这部分是擦除区域，那么重新设置 state 状态 */
     if (bootutil_buffer_is_erased(fap, &swap_info, sizeof swap_info) ||
             state->swap_type > BOOT_SWAP_TYPE_REVERT) {
         state->swap_type = BOOT_SWAP_TYPE_NONE;
         state->image_num = 0;
     }
 
+    /* 读取 image trailer 的 copy_done 状态 */
     rc = boot_read_copy_done(fap, &state->copy_done);
     if (rc) {
         return BOOT_EFLASH;
     }
 
+    /* 更新 image ok 的状态 */
     return boot_read_image_ok(fap, &state->image_ok);
 }
 
@@ -305,6 +320,13 @@ boot_read_swap_state_by_id(int flash_area_id, struct boot_swap_state *state)
         return BOOT_EFLASH;
     }
 
+    /* 读取 image trailer 的 swap state 状态信息
+     * 主要涉及：
+     * swap info
+     * copy done
+     * image ok
+     * magic
+     * */
     rc = boot_read_swap_state(fap, state);
     flash_area_close(fap);
     return rc;
@@ -442,6 +464,7 @@ boot_swap_type_multi(int image_index)
                 table->image_ok_secondary_slot == secondary_slot.image_ok) &&
             (table->copy_done_primary_slot == BOOT_FLAG_ANY  ||
                 table->copy_done_primary_slot == primary_slot.copy_done)) {
+            /* 打印 swap 类型 */
             BOOT_LOG_INF("Swap type: %s",
                          table->swap_type == BOOT_SWAP_TYPE_TEST   ? "test"   :
                          table->swap_type == BOOT_SWAP_TYPE_PERM   ? "perm"   :

@@ -30,6 +30,7 @@
 
 MCUBOOT_LOG_MODULE_DECLARE(mcuboot);
 
+/* 如果没有显式定义 MCUBOOT_SWAP_USING_MOVE 选项,默认使用的是 scratch 方式更新 image */
 #if !defined(MCUBOOT_SWAP_USING_MOVE)
 
 #if defined(MCUBOOT_VALIDATE_PRIMARY_SLOT)
@@ -47,6 +48,9 @@ int boot_status_fails = 0;
 #define BOOT_STATUS_ASSERT(x) ASSERT(x)
 #endif
 
+/* 走的是这个区域
+ * 如果没有显式定义 MCUBOOT_SWAP_USING_MOVE， 默认使用的是 swap_scratch 方式
+ * */
 int
 boot_read_image_header(struct boot_loader_state *state, int slot,
                        struct image_header *out_hdr, struct boot_status *bs)
@@ -61,13 +65,16 @@ boot_read_image_header(struct boot_loader_state *state, int slot,
     (void)state;
 #endif
 
+    /* 获取相关的 flash area id,根据这个 id 可以找到指定的 flash 区域 */
     area_id = flash_area_id_from_multi_image_slot(BOOT_CURR_IMG(state), slot);
+    /* 打开这个 flash 设备，将相关的 flash area 信息保存到 fap */
     rc = flash_area_open(area_id, &fap);
     if (rc != 0) {
         rc = BOOT_EFLASH;
         goto done;
     }
 
+    /* 从这个 flash area 的头部读取 image header 信息 */
     rc = flash_area_read(fap, 0, out_hdr, sizeof *out_hdr);
     if (rc != 0) {
         rc = BOOT_EFLASH;
@@ -100,6 +107,7 @@ swap_read_status_bytes(const struct flash_area *fap,
     int rc;
     int i;
 
+    /* 获取 swap status 的偏移 */
     off = boot_status_off(fap);
     max_entries = boot_status_entries(BOOT_CURR_IMG(state), fap);
     if (max_entries < 0) {
@@ -110,14 +118,19 @@ swap_read_status_bytes(const struct flash_area *fap,
     found_idx = 0;
     invalid = 0;
     for (i = 0; i < max_entries; i++) {
+        /* 逐个从 swap status 区将状态数据读取出来 */
         rc = flash_area_read(fap, off + i * BOOT_WRITE_SZ(state),
                 &status, 1);
         if (rc < 0) {
             return BOOT_EFLASH;
         }
 
+        /* 判断是否擦除状态 */
         if (bootutil_buffer_is_erased(fap, &status, 1)) {
             if (found && !found_idx) {
+                /* 匹配的 sector, 表示上一次 swap 到这个 sector 被中断了
+                 * 需要从这个 sector 恢复 swap
+                 * */
                 found_idx = i;
             }
         } else if (!found) {
@@ -146,9 +159,12 @@ swap_read_status_bytes(const struct flash_area *fap,
 
     if (found) {
         if (!found_idx) {
+            /* 表示 found_idx 是最后一个 */
             found_idx = i;
         }
+        /* 关联找到的 sector 和对应的状态信息 */
         bs->idx = (found_idx / BOOT_STATUS_STATE_COUNT) + 1;
+        /* 标记这个 sector 的状态 */
         bs->state = (found_idx % BOOT_STATUS_STATE_COUNT) + 1;
     }
 
@@ -172,6 +188,7 @@ boot_status_internal_off(const struct boot_status *bs, int elem_sz)
  * area, and have sizes that are a multiple of each other (powers of two
  * presumably!).
  */
+/* 检查 flash 空间容量是否满足要求 */
 int
 boot_slots_compatible(struct boot_loader_state *state)
 {
@@ -185,6 +202,7 @@ boot_slots_compatible(struct boot_loader_state *state)
     size_t i, j;
     int8_t smaller;
 
+    /* 检查 image 的大小是否超过限制 */
     num_sectors_primary = boot_img_num_sectors(state, BOOT_PRIMARY_SLOT);
     num_sectors_secondary = boot_img_num_sectors(state, BOOT_SECONDARY_SLOT);
     if ((num_sectors_primary > BOOT_MAX_IMG_SECTORS) ||
@@ -213,6 +231,7 @@ boot_slots_compatible(struct boot_loader_state *state)
             sz1 += boot_img_sector_size(state, BOOT_SECONDARY_SLOT, j);
             i++;
             j++;
+            /* 如果 primary size 比 secondary size 小 */
         } else if (sz0 < sz1) {
             sz0 += boot_img_sector_size(state, BOOT_PRIMARY_SLOT, i);
             /* Guarantee that multiple sectors of the secondary slot
@@ -377,7 +396,9 @@ swap_status_source(struct boot_loader_state *state)
     (void)state;
 #endif
 
+    /* 获取当前 image 的 index,针对只有一个 image 的镜像，index 都是 0 */
     image_index = BOOT_CURR_IMG(state);
+    /* 读取对应 image primary slot 的状态信息 */
     rc = boot_read_swap_state_by_id(FLASH_AREA_IMAGE_PRIMARY(image_index),
             &state_primary_slot);
     assert(rc == 0);
@@ -387,10 +408,12 @@ swap_status_source(struct boot_loader_state *state)
     assert(rc == 0);
 #endif
 
+    /* 将 primary slot 存储的 image trailer 中包含的状态信息打印出来 */
     BOOT_LOG_SWAP_STATE("Primary image", &state_primary_slot);
 #if MCUBOOT_SWAP_USING_SCRATCH
     BOOT_LOG_SWAP_STATE("Scratch", &state_scratch);
 #endif
+    /* 获取 boot status 详细信息 */
     for (i = 0; i < BOOT_STATUS_TABLES_COUNT; i++) {
         table = &boot_status_tables[i];
 
@@ -416,6 +439,7 @@ swap_status_source(struct boot_loader_state *state)
             }
 #endif
 
+            /* 选择启动源 */
             BOOT_LOG_INF("Boot source: %s",
                          source == BOOT_STATUS_SOURCE_NONE ? "none" :
                          source == BOOT_STATUS_SOURCE_SCRATCH ? "scratch" :

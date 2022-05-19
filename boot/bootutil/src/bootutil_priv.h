@@ -53,6 +53,7 @@ struct flash_area;
 
 /** Number of image slots in flash; currently limited to two. */
 #define BOOT_NUM_SLOTS                  2
+/* 使用 overwrite 方式 */
 #define MCUBOOT_OVERWRITE_ONLY
 
 #if (defined(MCUBOOT_OVERWRITE_ONLY) + \
@@ -196,19 +197,24 @@ _Static_assert(BOOT_IMAGE_NUMBER > 0, "Invalid value for BOOT_IMAGE_NUMBER");
 #ifdef MCUBOOT_USE_FLASH_AREA_GET_SECTORS
 typedef struct flash_sector boot_sector_t;
 #else
+/* 没有定义 MCUBOOT_USE_FLASH_AREA_GET_SECTORS 会走到这里
+ *
+ * */
 typedef struct flash_area boot_sector_t;
 #endif
 
 /** Private state maintained during boot. */
+/* boot loader 私有的统计状态的结构体 */
 struct boot_loader_state {
     struct {
-        struct image_header hdr;
+        struct image_header hdr;  /* 保存镜像的 image header */
         const struct flash_area *area;
-        boot_sector_t *sectors;
-        uint32_t num_sectors;
+        boot_sector_t *sectors;  /* 保存这个 image 占用的 sector 信息数组首地址 */
+        uint32_t num_sectors;  /* 这个 image 占用的 sector 数量 */
     } imgs[BOOT_IMAGE_NUMBER][BOOT_NUM_SLOTS];
 
 #if MCUBOOT_SWAP_USING_SCRATCH
+    /* 支持 scratch 的时候，会有这部分 flash 区域 */
     struct {
         const struct flash_area *area;
         boot_sector_t *sectors;
@@ -224,6 +230,7 @@ struct boot_loader_state {
 #endif
 
 #if (BOOT_IMAGE_NUMBER > 1)
+    /* 如果 image 的数量不为 1 */
     uint8_t curr_img_idx;
 #endif
 };

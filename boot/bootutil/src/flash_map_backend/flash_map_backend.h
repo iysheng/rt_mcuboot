@@ -17,8 +17,8 @@ struct flash_area {
     uint8_t  fa_id;         /** The slot/scratch identification */
     uint8_t  fa_device_id;  /** The device id (usually there's only one) */
     uint16_t pad16;
-    uint32_t fa_off;        /** The flash offset from the beginning */
-    uint32_t fa_size;       /** The size of this sector */
+    uint32_t fa_off;        /** The flash offset from the beginning \\ slot 或者 scratch 在 flash 中的偏移 */
+    uint32_t fa_size;       /** The size of this sector \\ slot 或者 scratch 占的大小 */
 };
 
 int flash_area_to_sectors(int idx, int *num, struct flash_area *sectors);

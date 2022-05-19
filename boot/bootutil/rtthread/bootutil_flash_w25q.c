@@ -87,6 +87,9 @@ int flash_area_to_sectors(int idx, int *num, struct flash_area *sectors)
 {
     int i = 0;
 
+    /* 根据具体的 image 和 slot 的 id 信息，赋值相关的 flash sector 信息到
+     * struct boot_loader_state boot_data 结构体中进行统计
+     * */
     if (idx == FLASH_AREA_IMAGE_PRIMARY(0))
     {
         *num = MCUBOOT_IMAGE_SLOT_SECTOR_COUNTS;
@@ -171,6 +174,9 @@ int flash_area_read(const struct flash_area *fa, unsigned int offset, unsigned c
     return 0;
 }
 
+/*
+ * flash 区写对齐数量
+ * */
 int flash_area_align(const struct flash_area *fa)
 {
     return 4;

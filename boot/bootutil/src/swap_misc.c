@@ -136,6 +136,7 @@ swap_read_status(struct boot_loader_state *state, struct boot_status *bs)
     int area_id;
     int rc;
 
+    /* 决定启动源 */
     bs->source = swap_status_source(state);
     switch (bs->source) {
     case BOOT_STATUS_SOURCE_NONE:
@@ -147,7 +148,9 @@ swap_read_status(struct boot_loader_state *state, struct boot_status *bs)
         break;
 #endif
 
+        /* 选择从 primary slot 启动 */
     case BOOT_STATUS_SOURCE_PRIMARY_SLOT:
+        /* 获取当前 image 的 primary slot id */
         area_id = FLASH_AREA_IMAGE_PRIMARY(BOOT_CURR_IMG(state));
         break;
 
@@ -161,20 +164,24 @@ swap_read_status(struct boot_loader_state *state, struct boot_status *bs)
         return BOOT_EFLASH;
     }
 
+    /* 从 swap status 区遍历 sector 的状态，查找 sector 信息 */
     rc = swap_read_status_bytes(fap, state, bs);
     if (rc == 0) {
+        /* 读取 swap info 信息 */
         off = boot_swap_info_off(fap);
         rc = flash_area_read(fap, off, &swap_info, sizeof swap_info);
         if (rc != 0) {
             return BOOT_EFLASH;
         }
 
+        /* 更新 boot swap info 信息 */
         if (bootutil_buffer_is_erased(fap, &swap_info, sizeof swap_info)) {
             BOOT_SET_SWAP_INFO(swap_info, 0, BOOT_SWAP_TYPE_NONE);
             rc = 0;
         }
 
         /* Extract the swap type info */
+        /* 从 swap info 信息中解析 swap_type */
         bs->swap_type = BOOT_GET_SWAP_TYPE(swap_info);
     }
 

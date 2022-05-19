@@ -216,6 +216,7 @@ bootutil_find_key(uint8_t *keyhash, uint8_t keyhash_len)
         bootutil_sha256_update(&sha256_ctx, key->key, *key->len);
         bootutil_sha256_finish(&sha256_ctx, hash);
         if (!memcmp(hash, keyhash, keyhash_len)) {
+            /* 返回 key 的 hash 值 */
             bootutil_sha256_drop(&sha256_ctx);
             return i;
         }
@@ -329,6 +330,7 @@ bootutil_get_img_security_cnt(struct image_header *hdr,
  * Verify the integrity of the image.
  * Return non-zero if image could not be validated/does not validate.
  */
+/* 检验 image 的有效性 */
 fih_int
 bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
                       struct image_header *hdr, const struct flash_area *fap,
@@ -358,6 +360,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
     fih_int security_counter_valid = FIH_FAILURE;
 #endif
 
+    /* 计算这个 image 的 hash 值 */
     rc = bootutil_img_hash(enc_state, image_index, hdr, fap, tmp_buf,
             tmp_buf_sz, hash, seed, seed_len);
     if (rc) {
@@ -378,6 +381,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
      * and are able to do.
      */
     while (true) {
+        /* 遍历 tlv */
         rc = bootutil_tlv_iter_next(&it, &off, &len, &type);
         if (rc < 0) {
             goto out;
@@ -385,6 +389,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
             break;
         }
 
+        /* 如果是一个 IMAGE_TLV_SHA256 类型的 tlv */
         if (type == IMAGE_TLV_SHA256) {
             /*
              * Verify the SHA256 image hash.  This must always be
@@ -394,19 +399,23 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
                 rc = -1;
                 goto out;
             }
+            /* 将 tlv 信息读取到 hash 数组中 */
             rc = LOAD_IMAGE_DATA(hdr, fap, off, buf, sizeof(hash));
             if (rc) {
                 goto out;
             }
 
+            /* 对比 hash 值是否匹配 */
             FIH_CALL(boot_fih_memequal, fih_rc, hash, buf, sizeof(hash));
             if (fih_not_eq(fih_rc, FIH_SUCCESS)) {
                 goto out;
             }
 
+            /* 标记 hash 值有效 */
             sha256_valid = 1;
 #ifdef EXPECTED_SIG_TLV
 #ifndef MCUBOOT_HW_KEY
+            /* 如果支持对 image 签名，并且这个 tlv 保存的是 key 的 hash */
         } else if (type == IMAGE_TLV_KEYHASH) {
             /*
              * Determine which key we should be checking.
@@ -500,6 +509,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
     }
 
     rc = !sha256_valid;
+    /* 如果校验无效，返回 */
     if (rc) {
         goto out;
     }

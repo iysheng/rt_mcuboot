@@ -101,6 +101,7 @@ boot_status_sz(uint32_t min_write_sz)
            BOOT_STATUS_MAX_ENTRIES * BOOT_STATUS_STATE_COUNT * min_write_sz;
 }
 
+/* 返回 image trailer 的大小 */
 uint32_t
 boot_trailer_sz(uint32_t min_write_sz)
 {
@@ -119,6 +120,7 @@ boot_trailer_sz(uint32_t min_write_sz)
            BOOT_MAGIC_SZ;
 }
 
+/* 返回 swap status 的 entry 数量 */
 int
 boot_status_entries(int image_index, const struct flash_area *fap)
 {
@@ -145,6 +147,9 @@ boot_status_off(const struct flash_area *fap)
     off_from_end = boot_trailer_sz(elem_sz);
 
     assert(off_from_end <= fap->fa_size);
+    /* 返回 flash area 中 image trailer 的偏移，也就是 swap status 的首地址
+     * 因为 swap status 在 image trailer 的首部
+     * */
     return fap->fa_size - off_from_end;
 }
 
@@ -303,6 +308,7 @@ boot_write_copy_done(const struct flash_area *fap)
     BOOT_LOG_DBG("writing copy_done; fa_id=%d off=0x%lx (0x%lx)",
                  fap->fa_id, (unsigned long)off,
                  (unsigned long)(fap->fa_off + off));
+    /* 标记 image trailer copy done flag */
     return boot_write_trailer_flag(fap, off, BOOT_FLAG_SET);
 }
 
