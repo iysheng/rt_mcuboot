@@ -94,6 +94,7 @@ out:
 }
 #endif
 
+/* image trailer 中 boot status 区大小 */
 uint32_t
 boot_status_sz(uint32_t min_write_sz)
 {
@@ -136,6 +137,9 @@ boot_status_entries(int image_index, const struct flash_area *fap)
     return -1;
 }
 
+/*
+ * 返回的是 image trailer 中 boot_status 的偏移，也就是 image trailer 的偏移
+ * */
 uint32_t
 boot_status_off(const struct flash_area *fap)
 {

@@ -78,6 +78,12 @@ struct flash_area;
  */
 struct boot_status {
     uint32_t idx;         /* Which area we're operating on */
+    /*
+     * state 有三种情况
+     * state0 -> 1
+     * state1 -> 2
+     * state2 -> 3
+     * */
     uint8_t state;        /* Which part of the swapping process are we at */
     uint8_t op;           /* What operation are we performing? */
     uint8_t use_scratch;  /* Are status bytes ever written to scratch? */
@@ -176,6 +182,7 @@ _Static_assert(BOOT_IMAGE_NUMBER > 0, "Invalid value for BOOT_IMAGE_NUMBER");
 #define BOOT_STATUS_SWAP_STATE_COUNT    2
 #define BOOT_STATUS_STATE_COUNT         (BOOT_STATUS_MOVE_STATE_COUNT + BOOT_STATUS_SWAP_STATE_COUNT)
 #else
+/* 表示一共有三种可能的状态 */
 #define BOOT_STATUS_STATE_COUNT         3
 #endif
 

@@ -180,6 +180,7 @@ fill_rsp(struct boot_loader_state *state, void *slot_usage,
 
 #if (BOOT_IMAGE_NUMBER > 1)
     /* Always boot from Image 0. */
+    /* 如果启动 image 有多个，总是从 image 0 启动 */
     BOOT_CURR_IMG(state) = 0;
 #endif
 
@@ -1932,7 +1933,7 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
         /* 获取当前镜像的编号,只有一个 image 的时候，这个数值一直是 0 */
         image_index = BOOT_CURR_IMG(state);
 
-        /* 关联这个 image 的 primarey 和 secondary slot 的首地址 */
+        /* 关联这个 image 的 primary 和 secondary slot 的首地址 */
         BOOT_IMG(state, BOOT_PRIMARY_SLOT).sectors =
             primary_slot_sectors[image_index];
         BOOT_IMG(state, BOOT_SECONDARY_SLOT).sectors =
@@ -2044,6 +2045,7 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
             BOOT_SWAP_TYPE(state) = BOOT_SWAP_TYPE_PANIC;
         }
 
+        /* 检查是否更新出错 */
         if (BOOT_SWAP_TYPE(state) == BOOT_SWAP_TYPE_PANIC) {
             BOOT_LOG_ERR("panic!");
             assert(0);
@@ -2112,6 +2114,7 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
      */
     memset(&bs, 0, sizeof(struct boot_status));
 
+    /* 将状态信息更新到 rsp, do_boot 函数会根据 rsp 的内容启动 image */
     fill_rsp(state, NULL, rsp);
 
     fih_rc = FIH_SUCCESS;

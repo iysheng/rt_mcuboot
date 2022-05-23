@@ -174,14 +174,16 @@ swap_read_status(struct boot_loader_state *state, struct boot_status *bs)
             return BOOT_EFLASH;
         }
 
-        /* 更新 boot swap info 信息 */
+        /* 如果 swap info 区是擦除状态，那么标记 swap info 为 BOOT_SWAP_TYPE_NONE 表示不需要 swap */
         if (bootutil_buffer_is_erased(fap, &swap_info, sizeof swap_info)) {
             BOOT_SET_SWAP_INFO(swap_info, 0, BOOT_SWAP_TYPE_NONE);
             rc = 0;
         }
 
         /* Extract the swap type info */
-        /* 从 swap info 信息中解析 swap_type */
+        /* 从 swap info 信息中解析 swap_type
+         * 赋值给 boot_status
+         * */
         bs->swap_type = BOOT_GET_SWAP_TYPE(swap_info);
     }
 

@@ -72,9 +72,9 @@ extern "C" {
 
 #define BOOT_MAX_ALIGN          8
 
-#define BOOT_MAGIC_GOOD     1
-#define BOOT_MAGIC_BAD      2
-#define BOOT_MAGIC_UNSET    3
+#define BOOT_MAGIC_GOOD     1  /* magic 匹配 */
+#define BOOT_MAGIC_BAD      2  /* magic 不匹配 */
+#define BOOT_MAGIC_UNSET    3  /* 没有设置 magic, image trailer 处在擦除状态 */
 #define BOOT_MAGIC_ANY      4  /* NOTE: control only, not dependent on sector */
 #define BOOT_MAGIC_NOTGOOD  5  /* NOTE: control only, not dependent on sector */
 

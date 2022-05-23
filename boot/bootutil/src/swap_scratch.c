@@ -74,7 +74,7 @@ boot_read_image_header(struct boot_loader_state *state, int slot,
         goto done;
     }
 
-    /* 从这个 flash area 的头部读取 image header 信息 */
+    /* 读取 image header 信息保存到 state */
     rc = flash_area_read(fap, 0, out_hdr, sizeof *out_hdr);
     if (rc != 0) {
         rc = BOOT_EFLASH;
@@ -107,7 +107,9 @@ swap_read_status_bytes(const struct flash_area *fap,
     int rc;
     int i;
 
-    /* 获取 swap status 的偏移 */
+    /* 获取 swap status 的偏移
+     * 即 image trailer 的偏移
+     * */
     off = boot_status_off(fap);
     max_entries = boot_status_entries(BOOT_CURR_IMG(state), fap);
     if (max_entries < 0) {
@@ -117,6 +119,7 @@ swap_read_status_bytes(const struct flash_area *fap,
     found = 0;
     found_idx = 0;
     invalid = 0;
+    /* 获取每一个 swap status entry 的状态 */
     for (i = 0; i < max_entries; i++) {
         /* 逐个从 swap status 区将状态数据读取出来 */
         rc = flash_area_read(fap, off + i * BOOT_WRITE_SZ(state),
@@ -129,13 +132,17 @@ swap_read_status_bytes(const struct flash_area *fap,
         if (bootutil_buffer_is_erased(fap, &status, 1)) {
             if (found && !found_idx) {
                 /* 匹配的 sector, 表示上一次 swap 到这个 sector 被中断了
-                 * 需要从这个 sector 恢复 swap
+                 * 需要从这个 sector 恢复 swap, 到这里之可能是状态1 或者是状态 2
                  * */
                 found_idx = i;
             }
         } else if (!found) {
+            /* 说明上一个 swap 为中断过 */
             found = 1;
         } else if (found_idx) {
+            /* 如果存在不止两个 swap status 不是擦除状态 swap status entry
+             * 标记无效,因为这个状态归属异常
+             * */
             invalid = 1;
             break;
         }
@@ -159,12 +166,14 @@ swap_read_status_bytes(const struct flash_area *fap,
 
     if (found) {
         if (!found_idx) {
-            /* 表示 found_idx 是最后一个 */
+            /* 表示 found_idx 是最后一个
+             * 这时候就是状态 1, 即 state0 ，所有 swap status 区都是擦除状态
+             * */
             found_idx = i;
         }
         /* 关联找到的 sector 和对应的状态信息 */
         bs->idx = (found_idx / BOOT_STATUS_STATE_COUNT) + 1;
-        /* 标记这个 sector 的状态 */
+        /* 标记这个 sector 的状态,一共有三种可能的状态 */
         bs->state = (found_idx % BOOT_STATUS_STATE_COUNT) + 1;
     }
 
@@ -303,6 +312,13 @@ struct boot_status_table {
  * This set of tables maps swap state contents to boot status location.
  * When searching for a match, these tables must be iterated in order.
  */
+/*
+ * 根据
+ * primary slot magic
+ * scratch magic
+ * primary copy done
+ * 上述三部分的组合，可以确定启动不同的启动源
+ * */
 static const struct boot_status_table boot_status_tables[] = {
     {
         /*           | primary slot | scratch      |

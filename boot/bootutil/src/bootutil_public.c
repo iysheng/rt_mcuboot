@@ -207,6 +207,7 @@ boot_enc_key_off(const struct flash_area *fap, uint8_t slot)
 }
 #endif
 
+/* 判断这个 buffer 是否是擦处状态 */
 bool bootutil_buffer_is_erased(const struct flash_area *area,
                                const void *buffer, size_t len)
 {
@@ -252,7 +253,6 @@ boot_read_copy_done(const struct flash_area *fap, uint8_t *copy_done)
     return boot_read_flag(fap, copy_done, boot_copy_done_off(fap));
 }
 
-
 int
 boot_read_swap_state(const struct flash_area *fap,
                      struct boot_swap_state *state)
@@ -273,7 +273,7 @@ boot_read_swap_state(const struct flash_area *fap,
     if (bootutil_buffer_is_erased(fap, magic, BOOT_MAGIC_SZ)) {
         state->magic = BOOT_MAGIC_UNSET;
     } else {
-        /* 如果不是对 magic 进行解码对比 */
+        /* 对 magic 进行解码对比 */
         state->magic = boot_magic_decode(magic);
     }
 
