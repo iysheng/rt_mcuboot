@@ -472,6 +472,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
                                                            buf, len, key_id);
             key_id = -1;
 #endif /* EXPECTED_SIG_TLV */
+			/* 没有定义 */
 #ifdef MCUBOOT_HW_ROLLBACK_PROT
         } else if (type == IMAGE_TLV_SEC_CNT) {
             /*

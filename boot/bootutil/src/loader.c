@@ -872,6 +872,7 @@ boot_validated_swap_type(struct boot_loader_state *state,
     int swap_type;
     fih_int fih_rc = FIH_FAILURE;
 
+	/* 从 image trailer 中获取 swap type */
     swap_type = boot_swap_type_multi(BOOT_CURR_IMG(state));
     /* 如果需要进行 swap */
     if (BOOT_IS_UPGRADE(swap_type)) {
