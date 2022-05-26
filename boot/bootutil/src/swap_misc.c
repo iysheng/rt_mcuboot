@@ -32,6 +32,7 @@ MCUBOOT_LOG_MODULE_DECLARE(mcuboot);
 
 #if defined(MCUBOOT_SWAP_USING_SCRATCH) || defined(MCUBOOT_SWAP_USING_MOVE)
 int
+/* 擦除 image trailer 所在的 sectors */
 swap_erase_trailer_sectors(const struct boot_loader_state *state,
                            const struct flash_area *fap)
 {
@@ -64,8 +65,10 @@ swap_erase_trailer_sectors(const struct boot_loader_state *state,
 
     /* delete starting from last sector and moving to beginning */
     sector = boot_img_num_sectors(state, slot) - 1;
+    /* image trailer 大小 */
     trailer_sz = boot_trailer_sz(BOOT_WRITE_SZ(state));
     total_sz = 0;
+    /* 从尾部向前擦除 */
     do {
         sz = boot_img_sector_size(state, slot, sector);
         off = boot_img_sector_off(state, slot, sector);

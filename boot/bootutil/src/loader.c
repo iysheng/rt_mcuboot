@@ -487,6 +487,7 @@ static fih_int
 boot_image_check(struct boot_loader_state *state, struct image_header *hdr,
                  const struct flash_area *fap, struct boot_status *bs)
 {
+    /* hash 校验有关的临时缓冲区 */
     TARGET_STATIC uint8_t tmpbuf[BOOT_TMPBUF_SZ];
     uint8_t image_index;
     int rc;
@@ -499,8 +500,10 @@ boot_image_check(struct boot_loader_state *state, struct image_header *hdr,
     (void)bs;
     (void)rc;
 
+    /* 从 state 中获取当前 image 编号，一般地只有一个启动镜像,编号是 0 */
     image_index = BOOT_CURR_IMG(state);
 
+    /* 如果定义了加密镜像,一般未定义 */
 #ifdef MCUBOOT_ENC_IMAGES
     if (MUST_DECRYPT(fap, image_index, hdr)) {
         rc = boot_enc_load(BOOT_CURR_ENC(state), image_index, hdr, fap, bs);
@@ -562,10 +565,12 @@ boot_is_header_valid(const struct image_header *hdr, const struct flash_area *fa
 {
     uint32_t size;
 
+    /* 检查 magic */
     if (hdr->ih_magic != IMAGE_MAGIC) {
         return false;
     }
 
+    /* 确认 image 大小和 image header 大小是否超出范围，即是否溢出 */
     if (!boot_u32_safe_add(&size, hdr->ih_img_size, hdr->ih_hdr_size)) {
         return false;
     }
@@ -580,6 +585,7 @@ boot_is_header_valid(const struct image_header *hdr, const struct flash_area *fa
 /*
  * Check that a memory area consists of a given value.
  */
+/* 检查指定的一段内存是否是指定数值 */
 static inline bool
 boot_data_is_set_to(uint8_t val, void *data, size_t len)
 {
@@ -709,6 +715,7 @@ boot_rom_address_check(struct boot_loader_state *state,
  *         1 (or its fih_int encoded form)  if no bootloable image was found
  *         FIH_FAILURE                      on any errors
  */
+/* 校验指定 image 的 slot 内容 */
 static fih_int
 boot_validate_slot(struct boot_loader_state *state, int slot,
                    struct boot_status *bs)
@@ -744,6 +751,9 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
          * is erased.
          */
         if (slot != BOOT_PRIMARY_SLOT) {
+            /* 如果不是 primary slot,并且这个 secondary slot 无效，会擦除
+             *
+             * */
             swap_erase_trailer_sectors(state, fap);
         }
 #endif
@@ -772,7 +782,9 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
     }
 #endif
 
+    /* image 有效性检查，会使用指定的算法检查 */
     FIH_CALL(boot_image_check, fih_rc, state, hdr, fap, bs);
+    /* 检查 image header 的有效性,检查 magic */
     if (!boot_is_header_valid(hdr, fap) || fih_not_eq(fih_rc, FIH_SUCCESS)) {
         if ((slot != BOOT_PRIMARY_SLOT) || ARE_SLOTS_EQUIVALENT()) {
             /* 擦除这段 flash area */
@@ -849,6 +861,10 @@ done:
  *
  * @return                      The type of swap to perform (BOOT_SWAP_TYPE...)
  */
+/*
+ * 决定 swap 类型, 如果需要 swap，那么会检查 secondary slot 的有效性,如果无效会
+ * 擦除 secondary slot,然后标记 swap none
+ * */
 static int
 boot_validated_swap_type(struct boot_loader_state *state,
                          struct boot_status *bs)
@@ -857,6 +873,7 @@ boot_validated_swap_type(struct boot_loader_state *state,
     fih_int fih_rc = FIH_FAILURE;
 
     swap_type = boot_swap_type_multi(BOOT_CURR_IMG(state));
+    /* 如果需要进行 swap */
     if (BOOT_IS_UPGRADE(swap_type)) {
         /* Boot loader wants to switch to the secondary slot.
          * Ensure image is valid.
@@ -1699,7 +1716,7 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
     if (rc != 0) {
         /* Continue with next image if there is one. */
         BOOT_LOG_WRN("Failed reading image headers; Image=%u",
-                BOOT_CURR_IMG(state));
+            BOOT_CURR_IMG(state));
         BOOT_SWAP_TYPE(state) = BOOT_SWAP_TYPE_NONE;
         return;
     }
@@ -1752,7 +1769,7 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
         /* Determine if we rebooted in the middle of an image swap
          * operation. If a partial swap was detected, complete it.
          */
-        /* 如果不是初始状态 */
+        /* 如果不是初始状态,说明上一次 swap 被中断了 */
         if (!boot_status_is_reset(bs)) {
 
 #if (BOOT_IMAGE_NUMBER > 1)
@@ -1781,7 +1798,7 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
             BOOT_SWAP_TYPE(state) = BOOT_SWAP_TYPE_NONE;
         } else {
             /* There was no partial swap, determine swap type. */
-            /* 如果没有 swap none,那么从 image trailer 中获取 swap_type */
+            /* 如果没有被中断的 swap ,那么从 image trailer 中获取 swap_type */
             if (bs->swap_type == BOOT_SWAP_TYPE_NONE) {
                 BOOT_SWAP_TYPE(state) = boot_validated_swap_type(state, bs);
             } else {
@@ -1807,16 +1824,23 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
                  * magic, so also run validation on the primary slot to be
                  * sure it's not OK.
                  */
+                /* 检查 primary slot 是否是擦除状态
+                 * 如果是擦除状态返回 0
+                 * */
                 rc = boot_check_header_erased(state, BOOT_PRIMARY_SLOT);
                 FIH_CALL(boot_validate_slot, fih_rc,
                          state, BOOT_PRIMARY_SLOT, bs);
 
+                /*
+                 * 如果 primary 的 image header 无效或者这个 image 没有通过检验
+                 * */
                 if (rc == 0 || fih_not_eq(fih_rc, FIH_SUCCESS)) {
 
                     rc = (boot_img_hdr(state, BOOT_SECONDARY_SLOT)->ih_magic == IMAGE_MAGIC) ? 1: 0;
                     FIH_CALL(boot_validate_slot, fih_rc,
                              state, BOOT_SECONDARY_SLOT, bs);
 
+                    /* 如果 secondary slot 镜像有效，那么会标记 revert */
                     if (rc == 1 && fih_eq(fih_rc, FIH_SUCCESS)) {
                         /* Set swap type to REVERT to overwrite the primary
                          * slot with the image contained in secondary slot
@@ -1917,8 +1941,8 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
      * completed.
      */
     /* 遍历查找所有的镜像，在结束的时候，会确定 ：
-     * 1. wap 的类型
-     * 2. 所有被终止的 swap 都会完成
+     * 1. swap 的类型
+     * 2. 所有被中断的 swap 都会完成
      * */
     IMAGES_ITER(BOOT_CURR_IMG(state)) {
 
@@ -2059,6 +2083,10 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
      * have finished. By the end of the loop each image in the primary slot will
      * have been re-validated.
      */
+    /*
+     * 到这里的时候，所有的 image 都已经更新（如果有需要的化）完成了，此时会重新
+     * 对 primary 的镜像进行校验
+     * */
     IMAGES_ITER(BOOT_CURR_IMG(state)) {
         if (BOOT_SWAP_TYPE(state) != BOOT_SWAP_TYPE_NONE) {
             /* Attempt to read an image header from each slot. Ensure that image
@@ -2076,7 +2104,9 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
              */
         }
 
-        /* 如果支持校验 primary slot 数据 */
+        /* 如果支持校验 primary slot 镜像
+         * 定义了这个宏，会对 primary slot 镜像进行校验
+         * */
 #ifdef MCUBOOT_VALIDATE_PRIMARY_SLOT
         FIH_CALL(boot_validate_slot, fih_rc, state, BOOT_PRIMARY_SLOT, NULL);
         if (fih_not_eq(fih_rc, FIH_SUCCESS)) {

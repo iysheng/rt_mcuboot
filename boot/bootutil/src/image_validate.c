@@ -341,7 +341,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
     uint16_t len;
     uint16_t type;
     int sha256_valid = 0;
-#ifdef EXPECTED_SIG_TLV
+#ifdef EXPECTED_SIG_TLV /* 定义了这个宏 */
     fih_int valid_signature = FIH_FAILURE;
     int key_id = -1;
 #ifdef MCUBOOT_HW_KEY
@@ -360,13 +360,14 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
     fih_int security_counter_valid = FIH_FAILURE;
 #endif
 
-    /* 计算这个 image 的 hash 值 */
+    /* 计算这个 image 的 hash 值,结果是 32 字节 */
     rc = bootutil_img_hash(enc_state, image_index, hdr, fap, tmp_buf,
             tmp_buf_sz, hash, seed, seed_len);
     if (rc) {
         goto out;
     }
 
+    /* 如果 out_hash 不为空，将计算出来的 hash 值复制到 out_hash */
     if (out_hash) {
         memcpy(out_hash, hash, 32);
     }
@@ -380,6 +381,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
      * Traverse through all of the TLVs, performing any checks we know
      * and are able to do.
      */
+    /* 遍历 tlvs */
     while (true) {
         /* 遍历 tlv */
         rc = bootutil_tlv_iter_next(&it, &off, &len, &type);

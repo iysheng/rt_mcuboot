@@ -262,7 +262,7 @@ boot_read_swap_state(const struct flash_area *fap,
     uint8_t swap_info;
     int rc;
 
-    /* 获取 magic 的偏移 */
+    /* 获取 magic 的偏移,在 flash area 的尾部 */
     off = boot_magic_off(fap);
     /* 将保存在 image trailer 中的 magic 读取到内存 */
     rc = flash_area_read(fap, off, magic, BOOT_MAGIC_SZ);
@@ -271,9 +271,10 @@ boot_read_swap_state(const struct flash_area *fap,
     }
     /* 判断指定的区域是否是擦除过的 */
     if (bootutil_buffer_is_erased(fap, magic, BOOT_MAGIC_SZ)) {
+        /* 表示 image trailer 中没有设置过 magic */
         state->magic = BOOT_MAGIC_UNSET;
     } else {
-        /* 对 magic 进行解码对比 */
+        /* 对 magic 进行对比，确认 magic 是否有效 */
         state->magic = boot_magic_decode(magic);
     }
 
@@ -295,6 +296,7 @@ boot_read_swap_state(const struct flash_area *fap,
     /* 如果这部分是擦除区域，那么重新设置 state 状态 */
     if (bootutil_buffer_is_erased(fap, &swap_info, sizeof swap_info) ||
             state->swap_type > BOOT_SWAP_TYPE_REVERT) {
+        /* 如果是擦除状态，表示不需要 swap */
         state->swap_type = BOOT_SWAP_TYPE_NONE;
         state->image_num = 0;
     }
@@ -338,11 +340,13 @@ boot_write_magic(const struct flash_area *fap)
     uint32_t off;
     int rc;
 
+    /* 获取 image trailer 中 magic 的偏移 */
     off = boot_magic_off(fap);
 
     BOOT_LOG_DBG("writing magic; fa_id=%d off=0x%lx (0x%lx)",
                  fap->fa_id, (unsigned long)off,
                  (unsigned long)(fap->fa_off + off));
+    /* 写入 image trailer 的 MAGIC */
     rc = flash_area_write(fap, off, boot_img_magic, BOOT_MAGIC_SZ);
     if (rc != 0) {
         return BOOT_EFLASH;
@@ -454,6 +458,7 @@ boot_swap_type_multi(int image_index)
     for (i = 0; i < BOOT_SWAP_TABLES_COUNT; i++) {
         table = boot_swap_tables + i;
 
+        /* 根据 flash 中的状态和预定义的配置，确定 swap_type */
         if (boot_magic_compatible_check(table->magic_primary_slot,
                                         primary_slot.magic) &&
             boot_magic_compatible_check(table->magic_secondary_slot,
@@ -515,11 +520,13 @@ boot_set_pending_multi(int image_index, int permanent)
     uint8_t swap_type;
     int rc;
 
+    /* 读取 secondary slot 的 flash area 信息 */
     rc = flash_area_open(FLASH_AREA_IMAGE_SECONDARY(image_index), &fap);
     if (rc != 0) {
         return BOOT_EFLASH;
     }
 
+    /* 读取 image trailer 中的 swap state 状态 */
     rc = boot_read_swap_state(fap, &state_secondary_slot);
     if (rc != 0) {
         goto done;
@@ -530,6 +537,7 @@ boot_set_pending_multi(int image_index, int permanent)
         /* Swap already scheduled. */
         break;
 
+        /* 如果没有设置过 magic */
     case BOOT_MAGIC_UNSET:
         rc = boot_write_magic(fap);
 
@@ -541,8 +549,10 @@ boot_set_pending_multi(int image_index, int permanent)
             if (permanent) {
                 swap_type = BOOT_SWAP_TYPE_PERM;
             } else {
+                /* 设置 swap 类型为 test */
                 swap_type = BOOT_SWAP_TYPE_TEST;
             }
+            /* 写入 swap type 信息到 image trailer */
             rc = boot_write_swap_info(fap, swap_type, 0);
         }
 

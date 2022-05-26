@@ -108,6 +108,7 @@ struct flash_area;
 					    */
 #define IMAGE_TLV_ANY               0xffff /* Used to iterate over all TLV */
 
+/* 镜像版本号 */
 struct image_version {
     uint8_t iv_major;
     uint8_t iv_minor;

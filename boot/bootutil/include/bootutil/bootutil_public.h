@@ -119,6 +119,7 @@ extern "C" {
 #endif
 
 struct boot_swap_state {
+    /* image trailer 中的 magic */
     uint8_t magic;      /* One of the BOOT_MAGIC_[...] values. */
     uint8_t swap_type;  /* One of the BOOT_SWAP_TYPE_[...] values. */
     uint8_t copy_done;  /* One of the BOOT_FLAG_[...] values. */
