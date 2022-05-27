@@ -97,7 +97,7 @@ static const struct boot_swap_table boot_swap_tables[] = {
         .image_ok_primary_slot =    BOOT_FLAG_ANY,
         .image_ok_secondary_slot =  BOOT_FLAG_UNSET,
         .copy_done_primary_slot =   BOOT_FLAG_ANY,
-        .swap_type =                BOOT_SWAP_TYPE_TEST,
+        .swap_type =                BOOT_SWAP_TYPE_TEST, /* test swap 的 image trailer 存储信息 */
     },
     {
         .magic_primary_slot =       BOOT_MAGIC_ANY,
@@ -238,6 +238,7 @@ boot_read_flag(const struct flash_area *fap, uint8_t *flag, uint32_t off)
     if (rc < 0) {
         return BOOT_EFLASH;
     }
+    /* 如果是擦除状态表示未 FLAG_UNSET */
     if (bootutil_buffer_is_erased(fap, flag, sizeof *flag)) {
         *flag = BOOT_FLAG_UNSET;
     } else {
@@ -280,7 +281,9 @@ boot_read_swap_state(const struct flash_area *fap,
 
     /* 获取在 image trailer 中的 swap info 的偏移 */
     off = boot_swap_info_off(fap);
-    /* 从 flash 中读取 swap_info */
+    /* 从 flash 中读取 swap_info
+     * swap_info 包含了 swap 类型和 image number
+     * */
     rc = flash_area_read(fap, off, &swap_info, sizeof swap_info);
     if (rc < 0) {
         return BOOT_EFLASH;
@@ -293,7 +296,9 @@ boot_read_swap_state(const struct flash_area *fap,
     state->swap_type = BOOT_GET_SWAP_TYPE(swap_info);
     state->image_num = BOOT_GET_IMAGE_NUM(swap_info);
 
-    /* 如果这部分是擦除区域，那么重新设置 state 状态 */
+    /* 如果这部分是擦除状态，说明是原始状态，那么需要重新设置 state 状态
+     * 并检查 swap_type 有效性
+     * */
     if (bootutil_buffer_is_erased(fap, &swap_info, sizeof swap_info) ||
             state->swap_type > BOOT_SWAP_TYPE_REVERT) {
         /* 如果是擦除状态，表示不需要 swap */
@@ -307,7 +312,7 @@ boot_read_swap_state(const struct flash_area *fap,
         return BOOT_EFLASH;
     }
 
-    /* 更新 image ok 的状态 */
+    /* 读取 image ok 的状态 */
     return boot_read_image_ok(fap, &state->image_ok);
 }
 
@@ -434,6 +439,7 @@ boot_write_swap_info(const struct flash_area *fap, uint8_t swap_type,
     return boot_write_trailer(fap, off, (const uint8_t *) &swap_info, 1);
 }
 
+/* 从 image trailer 中获取 swap type */
 int
 boot_swap_type_multi(int image_index)
 {
@@ -443,12 +449,14 @@ boot_swap_type_multi(int image_index)
     int rc;
     size_t i;
 
+    /* 读取 primary swap state 信息 */
     rc = boot_read_swap_state_by_id(FLASH_AREA_IMAGE_PRIMARY(image_index),
                                     &primary_slot);
     if (rc) {
         return BOOT_SWAP_TYPE_PANIC;
     }
 
+    /* 读取 secondary swap state 信息 */
     rc = boot_read_swap_state_by_id(FLASH_AREA_IMAGE_SECONDARY(image_index),
                                     &secondary_slot);
     if (rc) {

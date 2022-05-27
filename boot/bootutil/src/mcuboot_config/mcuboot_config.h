@@ -27,8 +27,8 @@
  * You must choose exactly one signature type.
  */
 /* Uncomment for RSA signature support */
-//#define MCUBOOT_SIGN_RSA
-//#define MCUBOOT_SIGN_RSA_LEN    2048
+#define MCUBOOT_SIGN_RSA
+#define MCUBOOT_SIGN_RSA_LEN    2048
 
 /* Uncomment for ECDSA signatures using curve P-256. */
 /* #define MCUBOOT_SIGN_EC256 */

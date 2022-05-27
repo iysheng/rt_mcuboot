@@ -198,6 +198,7 @@ bootutil_img_hash(struct enc_key_data *enc_state, int image_index,
 
 #ifdef EXPECTED_SIG_TLV
 #if !defined(MCUBOOT_HW_KEY)
+/* 执行的这个函数 */
 static int
 bootutil_find_key(uint8_t *keyhash, uint8_t keyhash_len)
 {
@@ -210,11 +211,15 @@ bootutil_find_key(uint8_t *keyhash, uint8_t keyhash_len)
         return -1;
     }
 
+    /* 公钥 */
     for (i = 0; i < bootutil_key_cnt; i++) {
+        /* 计算存储在代码中的 key 的 hash 值 */
         key = &bootutil_keys[i];
+
         bootutil_sha256_init(&sha256_ctx);
         bootutil_sha256_update(&sha256_ctx, key->key, *key->len);
         bootutil_sha256_finish(&sha256_ctx, hash);
+        /* 如果 key 的 hash 值一样 */
         if (!memcmp(hash, keyhash, keyhash_len)) {
             /* 返回 key 的 hash 值 */
             bootutil_sha256_drop(&sha256_ctx);
@@ -222,6 +227,7 @@ bootutil_find_key(uint8_t *keyhash, uint8_t keyhash_len)
         }
     }
     bootutil_sha256_drop(&sha256_ctx);
+    /* 没有匹配到 key,返回 -1 */
     return -1;
 }
 #else
@@ -372,6 +378,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
         memcpy(out_hash, hash, 32);
     }
 
+    /* 查找 tlv 信息 */
     rc = bootutil_tlv_iter_begin(&it, hdr, fap, IMAGE_TLV_ANY, false);
     if (rc) {
         goto out;
@@ -391,7 +398,9 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
             break;
         }
 
-        /* 如果是一个 IMAGE_TLV_SHA256 类型的 tlv */
+        /* 如果是一个 IMAGE_TLV_SHA256 类型的 tlv
+         * sha256 hash 数值
+         * */
         if (type == IMAGE_TLV_SHA256) {
             /*
              * Verify the SHA256 image hash.  This must always be
@@ -454,7 +463,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
              * can be multiple signatures, each preceded by a key.
              */
 #endif /* !MCUBOOT_HW_KEY */
-        } else if (type == EXPECTED_SIG_TLV) {
+        } else if (type == EXPECTED_SIG_TLV) { /* 如果 SIGNED TLV, 比如说是 RSA2048 */
             /* Ignore this signature if it is out of bounds. */
             if (key_id < 0 || key_id >= bootutil_key_cnt) {
                 key_id = -1;
@@ -464,6 +473,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
                 rc = -1;
                 goto out;
             }
+            /* 读取 RSA key */
             rc = LOAD_IMAGE_DATA(hdr, fap, off, buf, len);
             if (rc) {
                 goto out;

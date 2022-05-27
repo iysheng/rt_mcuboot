@@ -47,16 +47,20 @@ bootutil_tlv_iter_begin(struct image_tlv_iter *it, const struct image_header *hd
         return -1;
     }
 
+    /* tlvs 紧紧跟在 image 后 */
     off_ = BOOT_TLV_OFF(hdr);
+    /* 读取 image_tlv_info 可以认为是 tlv 的 header 信息 */
     if (LOAD_IMAGE_DATA(hdr, fap, off_, &info, sizeof(info))) {
         return -1;
     }
 
+    /* 确认 tlv 的类型，是否是 PROTECTED */
     if (info.it_magic == IMAGE_TLV_PROT_INFO_MAGIC) {
         if (hdr->ih_protect_tlv_size != info.it_tlv_tot) {
             return -1;
         }
 
+        /* 读取下一组 tlv */
         if (LOAD_IMAGE_DATA(hdr, fap, off_ + info.it_tlv_tot,
                             &info, sizeof(info))) {
             return -1;
@@ -65,6 +69,7 @@ bootutil_tlv_iter_begin(struct image_tlv_iter *it, const struct image_header *hd
         return -1;
     }
 
+    /* 确认是否是普通类型的 tlv */
     if (info.it_magic != IMAGE_TLV_INFO_MAGIC) {
         return -1;
     }
@@ -77,7 +82,7 @@ bootutil_tlv_iter_begin(struct image_tlv_iter *it, const struct image_header *hd
     it->prot_end = off_ + it->hdr->ih_protect_tlv_size;
     it->tlv_end = off_ + it->hdr->ih_protect_tlv_size + info.it_tlv_tot;
     // position on first TLV
-    // 第一个 tlv 的偏移信息
+    // 第一个 tlv 的偏移信息(可能是 protected 也可能是一般的 tlv)
     it->tlv_off = off_ + sizeof(info);
     return 0;
 }
@@ -106,16 +111,23 @@ bootutil_tlv_iter_next(struct image_tlv_iter *it, uint32_t *off, uint16_t *len,
     }
 
     while (it->tlv_off < it->tlv_end) {
+        /* 如果遍历到了 protected 类型的 tlv 尾部，那么需要你加上一般的 tlv
+         * 头部的偏移，偏移量是 struct image_tlv_info 结构体大小
+         * */
         if (it->hdr->ih_protect_tlv_size > 0 && it->tlv_off == it->prot_end) {
             it->tlv_off += sizeof(struct image_tlv_info);
         }
 
+        /* 读取这个 tlv 信息 */
         rc = LOAD_IMAGE_DATA(it->hdr, it->fap, it->tlv_off, &tlv, sizeof tlv);
         if (rc) {
             return -1;
         }
 
         /* No more TLVs in the protected area */
+        /* 如果指定遍历 protected tlv 并且检测到遍历的 tlv 超出了 protected area 区域
+         * 那么就返回 1
+         * */
         if (it->prot && it->tlv_off >= it->prot_end) {
             return 1;
         }

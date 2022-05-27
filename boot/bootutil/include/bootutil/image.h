@@ -81,6 +81,7 @@ struct flash_area;
  *   1st on identifies the public key which should be used to verify it.
  *   2nd one is the actual signature.
  */
+/* 公钥的 hash */
 #define IMAGE_TLV_KEYHASH           0x01   /* hash of the public key */
 #define IMAGE_TLV_PUBKEY            0x02   /* public key */
 #define IMAGE_TLV_SHA256            0x10   /* SHA256 of image hdr and body */

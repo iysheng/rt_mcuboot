@@ -599,6 +599,7 @@ boot_data_is_set_to(uint8_t val, void *data, size_t len)
     return true;
 }
 
+/* 返回 0 表示是 erased 状态 */
 static int
 boot_check_header_erased(struct boot_loader_state *state, int slot)
 {
@@ -618,6 +619,7 @@ boot_check_header_erased(struct boot_loader_state *state, int slot)
     flash_area_close(fap);
 
     hdr = boot_img_hdr(state, slot);
+    /* 如果 image header 是擦除状态,返回 -1 */
     if (!boot_data_is_set_to(erased_val, &hdr->ih_magic, sizeof(hdr->ih_magic))) {
         return -1;
     }
@@ -735,10 +737,13 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
 
     /* 获取保存在 state 中的 image head 首地址 */
     hdr = boot_img_hdr(state, slot);
-    /* 检查 header 的有效性 */
+    /* 检查 header 的有效性
+     * 如果是擦除状态，或者 image 镜像不可启动
+     * */
     if (boot_check_header_erased(state, slot) == 0 ||
         (hdr->ih_flags & IMAGE_F_NON_BOOTABLE)) {
 
+        /* 未定义这两个宏 */
 #if defined(MCUBOOT_SWAP_USING_SCRATCH) || defined(MCUBOOT_SWAP_USING_MOVE)
         /*
          * This fixes an issue where an image might be erased, but a trailer
@@ -782,9 +787,13 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
     }
 #endif
 
-    /* image 有效性检查，会使用指定的算法检查 */
+    /* image 有效性检查，会使用指定的算法检查
+     * 这里目前存在问题
+     * */
     FIH_CALL(boot_image_check, fih_rc, state, hdr, fap, bs);
-    /* 检查 image header 的有效性,检查 magic */
+    /* 检查 image header 的有效性, 检查 magic 如果无效
+     * 或者检查出错，那么会擦除这个 slot
+     * */
     if (!boot_is_header_valid(hdr, fap) || fih_not_eq(fih_rc, FIH_SUCCESS)) {
         if ((slot != BOOT_PRIMARY_SLOT) || ARE_SLOTS_EQUIVALENT()) {
             /* 擦除这段 flash area */
@@ -879,6 +888,7 @@ boot_validated_swap_type(struct boot_loader_state *state,
         /* Boot loader wants to switch to the secondary slot.
          * Ensure image is valid.
          */
+        /* 如果需要进行 swap, 检查 secondary slot 数据的有效性 */
         FIH_CALL(boot_validate_slot, fih_rc, state, BOOT_SECONDARY_SLOT, bs);
         if (fih_not_eq(fih_rc, FIH_SUCCESS)) {
             if (fih_eq(fih_rc, fih_int_encode(1))) {
@@ -1500,7 +1510,7 @@ boot_perform_update(struct boot_loader_state *state, struct boot_status *bs)
     /*
      * 擦除 primary slot
      * 复制 secondary slot 到 primary slot
-     * 擦处 secondary slot 的 第一个 sector 和最后一个 sector
+     * 擦除 secondary slot 的 第一个 sector 和最后一个 sector
      * */
     rc = boot_copy_image(state, bs);
 #elif defined(MCUBOOT_BOOTSTRAP)
@@ -1690,6 +1700,9 @@ boot_review_image_swap_types(struct boot_loader_state *state,
  * @param bs                    Pointer where the read and possibly updated
  *                              boot status can be written to.
  */
+/*
+ * 根据 image trailer 和 secondary slot 的内容确定 swap type
+ * */
 static void
 boot_prepare_image_for_update(struct boot_loader_state *state,
                               struct boot_status *bs)
@@ -1799,8 +1812,14 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
             BOOT_SWAP_TYPE(state) = BOOT_SWAP_TYPE_NONE;
         } else {
             /* There was no partial swap, determine swap type. */
-            /* 如果没有被中断的 swap ,那么从 image trailer 中获取 swap_type */
+            /* 如果没有被中断的 swap ,即为初始化状态，
+             * 那么从 image trailer 中获取 swap_type
+             * */
             if (bs->swap_type == BOOT_SWAP_TYPE_NONE) {
+                /* 从 image trailer 中获取 swap 类型
+                 * 如果需要 swap 还会对 secondary slot 的内容进行校验
+                 * */
+                LOG_I("Get here to determine swap type");
                 BOOT_SWAP_TYPE(state) = boot_validated_swap_type(state, bs);
             } else {
                 FIH_CALL(boot_validate_slot, fih_rc,
@@ -1816,7 +1835,7 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
             boot_review_image_swap_types(state, false);
 #endif
 
-            /* 这个宏是做什么的？ */
+            /* 这个宏是做什么的？没有定义这个宏 */
 #ifdef MCUBOOT_BOOTSTRAP
             if (BOOT_SWAP_TYPE(state) == BOOT_SWAP_TYPE_NONE) {
                 /* Header checks are done first because they are
@@ -1856,6 +1875,7 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
         }
     } else {
         /* In that case if slots are not compatible. */
+        /* 如果 slot 空间不满足，设置 swap type 为 none */
         BOOT_SWAP_TYPE(state) = BOOT_SWAP_TYPE_NONE;
     }
 }
@@ -1991,6 +2011,7 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
         /* 确定 swap 类型，以及如果存在未完成的 swap,那么继续完成 swap */
         boot_prepare_image_for_update(state, &bs);
 
+        /* 根据 swap type 决定是否需要 swap 过程 */
         if (BOOT_IS_UPGRADE(BOOT_SWAP_TYPE(state))) {
             has_upgrade = true;
         }
@@ -2047,7 +2068,7 @@ context_boot_go(struct boot_loader_state *state, struct boot_rsp *rsp)
         case BOOT_SWAP_TYPE_TEST:          /* fallthrough */
         case BOOT_SWAP_TYPE_PERM:          /* fallthrough */
         case BOOT_SWAP_TYPE_REVERT:
-            /* 如果需要更新，启动更新 */
+            /* 启动更新 */
             rc = boot_perform_update(state, &bs);
             assert(rc == 0);
             break;
