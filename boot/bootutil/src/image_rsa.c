@@ -181,11 +181,13 @@ bootutil_cmp_rsasig(mbedtls_rsa_context *ctx, uint8_t *hash, uint32_t hlen,
         goto out;
     }
 
+    rt_kprintf("oh no 000\n");
     if (mbedtls_rsa_public(ctx, sig, em)) {
         rc = -1;
         goto out;
     }
 
+    rt_kprintf("oh no 111 %d\n", rc);
     /*
      * PKCS #1 v2.2, 9.1.2 EMSA-PSS-Verify
      *
@@ -296,12 +298,15 @@ bootutil_verify_sig(uint8_t *hash, uint32_t hlen, uint8_t *sig, size_t slen,
     uint8_t *cp;
     uint8_t *end;
 
+    rt_kprintf("get here\n");
     mbedtls_rsa_init(&ctx);
+    rt_kprintf("get here 000\n");
 
     cp = (uint8_t *)bootutil_keys[key_id].key;
     end = cp + *bootutil_keys[key_id].len;
 
     rc = bootutil_parse_rsakey(&ctx, &cp, end);
+    rt_kprintf("get here 111 %d\n", rc);
     if (rc || slen != ctx.len) {
         mbedtls_rsa_free(&ctx);
         goto out;

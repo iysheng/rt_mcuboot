@@ -641,6 +641,7 @@
  */
 #if defined(__GNUC__) && !defined(__OPTIMIZE__)
 #define MULADDC_CANNOT_USE_R7
+a
 #endif
 
 #if defined(__arm__) && !defined(MULADDC_CANNOT_USE_R7)
@@ -703,6 +704,7 @@
 #elif (__ARM_ARCH >= 6) && \
     defined (__ARM_FEATURE_DSP) && (__ARM_FEATURE_DSP == 1)
 
+//a
 #define MULADDC_INIT                            \
     asm(
 
@@ -926,7 +928,7 @@
 
 #if !defined(MULADDC_CORE)
 #if defined(MBEDTLS_HAVE_UDBL)
-
+b
 #define MULADDC_INIT                    \
 {                                       \
     mbedtls_t_udbl r;                           \
@@ -944,6 +946,7 @@
 }
 
 #else
+b
 #define MULADDC_INIT                    \
 {                                       \
     mbedtls_mpi_uint s0, s1, b0, b1;              \

@@ -762,6 +762,7 @@ int mbedtls_rsa_public( mbedtls_rsa_context *ctx,
     if( rsa_check_context( ctx, 0 /* public */, 0 /* no blinding */ ) )
         return( MBEDTLS_ERR_RSA_BAD_INPUT_DATA );
 
+    rt_kprintf("aaa 0000\n");
     mbedtls_mpi_init( &T );
 
 #if defined(MBEDTLS_THREADING_C)
@@ -771,15 +772,20 @@ int mbedtls_rsa_public( mbedtls_rsa_context *ctx,
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_read_binary( &T, input, ctx->len ) );
 
+    rt_kprintf("aaa 1111\n");
     if( mbedtls_mpi_cmp_mpi( &T, &ctx->N ) >= 0 )
     {
         ret = MBEDTLS_ERR_MPI_BAD_INPUT_DATA;
         goto cleanup;
     }
+    rt_kprintf("aaa 222\n");
 
     olen = ctx->len;
+    /* 执行这个时候出错了 */
     MBEDTLS_MPI_CHK( mbedtls_mpi_exp_mod( &T, &T, &ctx->E, &ctx->N, &ctx->RN ) );
+    rt_kprintf("aaa 333\n");
     MBEDTLS_MPI_CHK( mbedtls_mpi_write_binary( &T, output, olen ) );
+    rt_kprintf("aaa 444\n");
 
 cleanup:
 #if defined(MBEDTLS_THREADING_C)
