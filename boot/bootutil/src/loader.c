@@ -788,7 +788,6 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
 #endif
 
     /* image 有效性检查，会使用指定的算法检查
-     * 这里目前存在问题
      * */
     FIH_CALL(boot_image_check, fih_rc, state, hdr, fap, bs);
     /* 检查 image header 的有效性, 检查 magic 如果无效
@@ -881,7 +880,7 @@ boot_validated_swap_type(struct boot_loader_state *state,
     int swap_type;
     fih_int fih_rc = FIH_FAILURE;
 
-	/* 从 image trailer 中获取 swap type */
+    /* 从 image trailer 中获取 swap type */
     swap_type = boot_swap_type_multi(BOOT_CURR_IMG(state));
     /* 如果需要进行 swap */
     if (BOOT_IS_UPGRADE(swap_type)) {
@@ -1711,7 +1710,9 @@ boot_prepare_image_for_update(struct boot_loader_state *state,
     fih_int fih_rc = FIH_FAILURE;
 
     /* Determine the sector layout of the image slots and scratch area. */
-    /* 初始化 state 统计结构体中指定 image slot 的 flash 的 sector 信息 */
+    /* 初始化 state 统计结构体中指定 image slot 的 flash 的 sector 信息
+     * 具体包括 slot 包含的 sector 的数量，以及 sector 具体的偏移和大小信息
+     * */
     rc = boot_read_sectors(state);
     /* 如果检查出错，提示错误信息并返回 */
     if (rc != 0) {

@@ -463,7 +463,7 @@ bootutil_img_validate(struct enc_key_data *enc_state, int image_index,
              * can be multiple signatures, each preceded by a key.
              */
 #endif /* !MCUBOOT_HW_KEY */
-        } else if (type == EXPECTED_SIG_TLV) { /* 如果 SIGNED TLV, 比如说是 RSA2048 */
+        } else if (type == EXPECTED_SIG_TLV) { /* 如果 SIGNED TLV (签名), 比如说是 RSA2048 */
             /* Ignore this signature if it is out of bounds. */
             if (key_id < 0 || key_id >= bootutil_key_cnt) {
                 key_id = -1;

@@ -34,6 +34,9 @@
  * the application in order to interact with the MCUBoot bootloader.
  * This file contains shared code-base betwen MCUBoot and the application
  * which controls DFU process.
+ *
+ * 这个文件包含了 MCUBoot bootloader 交互的 API
+ *
  */
 
 #include <string.h>
