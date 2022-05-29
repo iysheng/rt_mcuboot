@@ -506,6 +506,7 @@ boot_image_check(struct boot_loader_state *state, struct image_header *hdr,
     /* 如果定义了加密镜像,一般未定义 */
 #ifdef MCUBOOT_ENC_IMAGES
     if (MUST_DECRYPT(fap, image_index, hdr)) {
+		/* 加载的还是 tlv 中的 key */
         rc = boot_enc_load(BOOT_CURR_ENC(state), image_index, hdr, fap, bs);
         if (rc < 0) {
             FIH_RET(fih_rc);
@@ -768,10 +769,11 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
         goto out;
     }
 
-    /* 如果仅仅使用 overwrite 并且阻止降级 */
+    /* 如果使用 overwrite 并且阻止降级 */
 #if defined(MCUBOOT_OVERWRITE_ONLY) && defined(MCUBOOT_DOWNGRADE_PREVENTION)
     if (slot != BOOT_PRIMARY_SLOT) {
         /* Check if version of secondary slot is sufficient */
+		/* 对比 primary 和 secondary slot 中的版本号 */
         rc = boot_version_cmp(
                 &boot_img_hdr(state, BOOT_SECONDARY_SLOT)->ih_ver,
                 &boot_img_hdr(state, BOOT_PRIMARY_SLOT)->ih_ver);
@@ -787,7 +789,7 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
     }
 #endif
 
-    /* image 有效性检查，会使用指定的算法检查
+    /* image 有效性检查，会使用指定的验签算法检查 tlv 中的签名
      * */
     FIH_CALL(boot_image_check, fih_rc, state, hdr, fap, bs);
     /* 检查 image header 的有效性, 检查 magic 如果无效
@@ -1057,6 +1059,7 @@ boot_copy_image(struct boot_loader_state *state, struct boot_status *bs)
     const struct flash_area *fap_secondary_slot;
     uint8_t image_index;
 
+	/* 没有定义这个宏 */
 #if defined(MCUBOOT_OVERWRITE_ONLY_FAST)
     uint32_t sector;
     uint32_t trailer_sz;
@@ -1120,6 +1123,7 @@ boot_copy_image(struct boot_loader_state *state, struct boot_status *bs)
     assert(rc == 0);
 #endif
 
+	/* 没有定义这个宏 */
 #ifdef MCUBOOT_ENC_IMAGES
     if (IS_ENCRYPTED(boot_img_hdr(state, BOOT_SECONDARY_SLOT))) {
         rc = boot_enc_load(BOOT_CURR_ENC(state), image_index,
@@ -1150,6 +1154,9 @@ boot_copy_image(struct boot_loader_state *state, struct boot_status *bs)
     }
 #endif
 
+	/* 硬件防止 rollback, 涉及到写 IMAGE_TLV_SEC_CNT 类型 tlv
+	 * 未定义
+	 * */
 #ifdef MCUBOOT_HW_ROLLBACK_PROT
     /* Update the stored security counter with the new image's security counter
      * value. Both slots hold the new image at this point, but the secondary
